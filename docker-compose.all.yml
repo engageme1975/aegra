@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegra-postgres
+    environment:
+      POSTGRES_USER: aegra
+      POSTGRES_PASSWORD: aegra-dev-password
+      POSTGRES_DB: aegra
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Aegra Backend (FastAPI)
+  aegra:
+    build:
+      context: ./aegra
+      dockerfile: Dockerfile
+    container_name: aegra-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegra:aegra-dev-password@postgres:5432/aegra
+      AUTH_TYPE: noop
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./aegra:/app/aegra
+    command: >
+      sh -c "
+        python3 scripts/migrate.py upgrade &&
+        uvicorn src.agent_server.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Agent Chat UI (Next.js)
+  agent-chat-ui:
+    build:
+      context: ./agent-chat-ui
+      dockerfile: Dockerfile.dev
+    container_name: agent-chat-ui
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_ASSISTANT_ID: agent
+    ports:
+      - "3000:3000"
+    depends_on:
+      - aegra
+    volumes:
+      - ./agent-chat-ui:/app
+    command: pnpm dev
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: aegra-network

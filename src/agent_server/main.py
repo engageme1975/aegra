@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.authentication import AuthenticationMiddleware
 
 from .api.assistants import router as assistants_router
+from .api.openai_compat import router as openai_compat_router
 from .api.runs import router as runs_router
 from .api.store import router as store_router
 from .api.threads import router as threads_router
@@ -111,6 +112,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router, prefix="", tags=["Health"])
+app.include_router(openai_compat_router, prefix="", tags=["OpenAI Compatible API"])
 app.include_router(assistants_router, prefix="", tags=["Assistants"])
 app.include_router(threads_router, prefix="", tags=["Threads"])
 app.include_router(runs_router, prefix="", tags=["Runs"])
